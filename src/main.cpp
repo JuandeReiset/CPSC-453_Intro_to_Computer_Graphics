@@ -232,22 +232,7 @@ using namespace opengl;
 
 		return true;
 	}
-	/*
-	std::vector<Vec3f> subdivideCurve(std::vector<Vec3f> const & points, int depth) {
-		std::vector<Vec3f> out;
-		Vec3f newPoint;
-		if (depth < 0) {
-			return points;
-		}
-		for (int i = 0; i < points.size() - 1; i++) {
-			newPoint = points[i] + (0.5 * (points[i + 1] - points[i]));
-			out.push_back(points[i]);
-			out.push_back(newPoint);
-			out.push_back(points[i + 1]);
-		}
-		return subdivideCurve(out, depth - 1);
-	}
-	*/
+
 	std::vector<Vec3f> subdivideClosedCurve(std::vector<Vec3f> const & points, int depth) {
 		std::vector<Vec3f> finer;
 		Vec3f tmp1, tmp2, tmploop;
@@ -426,10 +411,11 @@ using namespace opengl;
 		if (right_b_pressed) {
 
 			//float x = -1.0f + 2 * xpos / 1000; //THIS WORKS FOR FULL SCREEN
-			float x = -1.0f + 4 * xpos / 1000;
-			float y = +1.0f - 2 * ypos / 1000;
-			controlPoints[closeIndex] = Vec3f(x, y, 0);
-
+			
+				float x = -1.0f + 4 * xpos / 1000;
+				float y = +1.0f - 2 * ypos / 1000;
+				controlPoints[closeIndex] = Vec3f(x, y, 0);
+			
 			std::cout << "mouse edit";
 		}
 
@@ -468,8 +454,10 @@ using namespace opengl;
 
 			}
 			else {
-
-				controlPoints.push_back(clickPoint);
+				//Makes sure to not create control points outside of the screen
+				if (posX < 500) {
+					controlPoints.push_back(clickPoint);
+				}
 
 			}
 
@@ -484,8 +472,8 @@ using namespace opengl;
 			//Generate 3D vector point
 
 
-			float x = -1.0f + 2 * posX / 1000;
-			//float x = -1.0f + posX / 1000;
+			float x = -1.0f + 4 * posX / 1000;
+			//float x = -1.0f + 2* posX / 1000;
 			float y = +1.0f - 2 * posY / 1000;
 
 			Vec3f clickPoint = Vec3f(x, y, 0.f);
@@ -514,6 +502,7 @@ using namespace opengl;
 	int main() {
 		GLFWwindow *window = initWindow();
 
+
 		auto vao_control = makeVertexArrayObject();
 		auto vbo_control = makeBufferObject();
 		auto vao_curve = makeVertexArrayObject();
@@ -525,6 +514,7 @@ using namespace opengl;
 		GLuint totalIndices = 0;
 
 		Vec3f viewPosition(0, 0, 3);
+		Mat4f g_Curve = Mat4f::identity();
 		g_V = lookAtMatrix(viewPosition,    // eye position
 			{ 0.f, 0.f, 0.f }, // look at
 			{ 0.f, 1.f, 0.f }  // up vector
@@ -554,8 +544,6 @@ using namespace opengl;
 
 		//Load curve points
 
-		//outCurve = subdivideOpenCurve(controlPoints, 0);	//TODO - insert subdivision here
-		//loadGeometryToGPU(outCurve, vbo_curve.id());
 
 		Vec3f color_curve(0, 1, 1);
 		Vec3f color_control(1, 0, 0);
@@ -576,7 +564,7 @@ using namespace opengl;
 			glViewport(0, 0, g_width / 2, g_height);
 			program = &basicShader;
 			program->use();
-			setUniformMat4f(program->uniformLocation("model"), g_M, true);
+			setUniformMat4f(program->uniformLocation("model"), g_Curve, true);
 			setUniformMat4f(program->uniformLocation("view"), g_V, true);
 			setUniformMat4f(program->uniformLocation("projection"), g_P, true);
 			
@@ -586,8 +574,7 @@ using namespace opengl;
 			
 			//Draw control points
 		
-			//if (display_mode == 1) {
-				//glViewport(0, 0, g_width/2, g_height);
+		
 				loadGeometryToGPU(controlPoints, vbo_control.id());
 
 
@@ -596,17 +583,7 @@ using namespace opengl;
 					loadGeometryToGPU(outCurve, vbo_curve.id());
 
 				}
-				//if (has_changed) {
-					/*
-					program = &basicShader;
-					program->use();
-					setUniformMat4f(program->uniformLocation("model"), g_M, true);
-					setUniformMat4f(program->uniformLocation("view"), g_V, true);
-					setUniformMat4f(program->uniformLocation("projection"), g_P, true);
-					
-					has_changed = false;
-					*/
-				//}
+			
 				vao_control.bind();
 				setUniformVec3f(basicShader.uniformLocation("color"), color_control);
 
@@ -633,8 +610,8 @@ using namespace opengl;
 					0,						  // offset into buffer
 					controlPoints.size()	// number of vertices in buffer
 				);
-			//}
-			//if (display_mode == 2) {
+			
+			
 				glViewport(g_width/2, 0, g_width / 2, g_height);
 				program = &textureShader;
 				program->use();
@@ -645,20 +622,14 @@ using namespace opengl;
 				setUniformVec3f(textureShader.uniformLocation("lightColor"), lightColor);
 				glUniform1i(textureShader.uniformLocation("change_shader"), 2);
 				vao.bind();
-				if (has_changed) {
+				//if (has_changed) {
 				
 					 
-					{
+					//{
 						geometry::OBJMesh pot = surfaceofRevolution(outCurve, 4);
 					
-						//std::string filePath = "models/spot/spot_triangulated.obj";
-					
-
-						
-
-
 						//Calculate vertex normals if they are not included in .obj file
-						if (pot.normals.size() == 0 && pot.textureCoords.empty()) {
+						//if (pot.normals.size() == 0 && pot.textureCoords.empty()) {
 							auto normals =
 								geometry::calculateVertexNormals(pot.triangles, pot.vertices);
 
@@ -666,24 +637,24 @@ using namespace opengl;
 							//auto vboData = opengl::makeConsistentVertexTextureCoordNormalIndices(meshData, normals);
 							totalIndices =
 								opengl::setup_vao_and_buffers(vao, indexBuffer, vertexBuffer, vboData);
-						}
+						//}
 
-						write2OBJ(pot);
+						//write2OBJ(pot);
 
-					}
+					//}
 					has_changed = false;
 					//vao.bind();
-				}
+				//}
 				//setUniformVec3f(textureShader.uniformLocation("lightPosition"), lightPosition);
 				//setUniformVec3f(textureShader.uniformLocation("lightColor"), lightColor);
 				//glUniform1i(textureShader.uniformLocation("change_shader"), 2);
-				
+				vao.bind();
 				glDrawElements(GL_TRIANGLES,
 					totalIndices,    // # of triangles * 3
 					GL_UNSIGNED_INT, // type of indices
 					(void *)0        // offset
 				);
-			//}
+			
 
 			
 
